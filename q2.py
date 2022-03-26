@@ -1,4 +1,3 @@
-from multiprocessing import pool
 import numpy as np
 # import torch
 
@@ -21,7 +20,7 @@ def singlestep(node_vectors_previous: np.ndarray, stage: int=0):
     W = np.random.random((DIM, DIM))
     B = np.random.random((DIM, DIM))
 
-    print(f"Stage {stage}\n-----\nW={W}\nB={B}\n")
+    print(fr"\subsection{{Stage {{stage}}\n-----\nW={W}\nB={B}\n")
     for node_idx in range(N):
         pooled_neighbours = adjmatrix[node_idx]
         average_pool = node_vectors_previous[pooled_neighbours].sum(axis=0)
