@@ -2,6 +2,21 @@
 
 Question 3 of the assignment
 
+## Solutions to Part 2 - GCN
+
+### Base class
+
+Base class is implemented in `message_passing.py`. It builds on top of `torch.nn.Module` and has four separate methods: aggregate, initialize, update, output as mentioned in question.
+
+### Implementation of GCN
+
+```bash
+$ cd q3
+$ python -m src.main --task gcn --epochs 100
+```
+
+My implementation gets the following results: `val_loss=1.47, train_loss=1.05, val_accuracy=0.618, train_accuracy=1` on CiteSeer dataset. The implementation is given in `gcn.py` file, it builds on top of `message_passing.py` as required in question.
+
 ## Installation
 
 ```bash
@@ -18,9 +33,11 @@ python setup.py install
 
 ```bash
 scripts/download.sh
-python -m src.message_passing # for part 1
+python -m src.trainer --epochs 100 # for part 1
 python -m src.trainer # for citeseer training
 ```
+
+
 
 ## Data
 

@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Tuple
+from typing import List
 
 import torch
 from torch import IntTensor, Tensor
@@ -44,14 +44,16 @@ class MessagePassing(torch.nn.Module, ABC):
     def output(self, feature: Tensor) -> Tensor:
         pass
 
-    def get_normalization_factor(self, x, y):
-        return 1
 
     def forward(self, features: Tensor, edge_list: IntTensor) -> Tensor:
         """
         features = Node features/the X tensor
         Edge list = list of edges (from a to b)
         """
+
+        def get_normalization_factor(self, x, y):
+            return 1
+
         features = self.encoder(features)
         node_count = features.shape[0]
 

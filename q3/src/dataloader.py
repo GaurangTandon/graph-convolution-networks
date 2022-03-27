@@ -1,8 +1,9 @@
 from pathlib import Path
 from typing import Dict, Tuple, List
 
-from sklearn import preprocessing
 from torch_geometric.datasets import Planetoid
+
+from src.message_passing import device_name
 
 def read_nodes(dirpath: str='..\\citeseer'):
     node_id_to_idx: Dict[str, int] = {}
@@ -33,11 +34,17 @@ def read_edges(node_mapping: Dict[str, int], dirpath: str='..\\citeseer'):
 def get_citeseer_dataset():
     """
     I wasted a lot of time writing my own data reader from text files
-    before realizing this thing already exists in pytorch .-.
+    before realizing this thing already exists in pytorch ._.
     I hate myself
     """
     path = Path.cwd().parent / "citeseer"
-    return Planetoid(root=str(path), name="CiteSeer")
+    pt = Planetoid(root=str(path), name="CiteSeer")
+    pt.download()
+    # These two are the correct ways to get the data
+    # Do not use .get(idx), we don't know what it does
+    # print(dataset.data)
+    # print(dataset[0])
+    return pt.data.to(device=device_name)
 
     # class_labels = [
     #     "Agents",
@@ -53,7 +60,3 @@ def get_citeseer_dataset():
     edge_list = read_edges(node_id_maps)
     return edge_list, node_labels
     
-if __name__ == "__main__":
-    edge_list, node_labels = get_citeseer_dataset()
-    print(edge_list[:10])
-    print(node_labels[:10])

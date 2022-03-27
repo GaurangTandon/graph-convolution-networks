@@ -1,38 +1,13 @@
 from argparse import ArgumentParser
-from typing import Optional, List
+from typing import List
 
 import torch
 from torch import Tensor
-from torch.nn.functional import softmax, relu, cross_entropy
-
+from torch.nn.functional import cross_entropy
 from tqdm.auto import trange
 
-from src.message_passing import MessagePassing, device, device_name
 from src.dataloader import get_citeseer_dataset
-
-
-class CiteSeerGCN(MessagePassing):
-    def initialization(self):
-        self.f = relu
-        self.W = torch.nn.ModuleList([torch.nn.Linear(self.latent_dim, self.latent_dim, bias=False, device=device) for _ in range(self.layer_count)])
-        self.B = torch.nn.ModuleList([torch.nn.Linear(self.latent_dim, self.latent_dim, bias=False, device=device) for _ in range(self.layer_count)])
-
-        self.neighbours_aggregated: Optional[Tensor] = None
-        self.neighbour_count: Optional[Tensor] = None
-
-        self.encoder = torch.nn.Linear(self.input_dim, self.latent_dim, device=device)
-        self.decoder = torch.nn.Linear(self.latent_dim, self.output_dim, device=device)
-    
-    def combine(self, old_feature: Tensor, neighbor_aggregated: Tensor, layer_idx: int) -> Tensor:
-        my_thing = self.W[layer_idx](neighbor_aggregated)
-        neighbor_thing = self.B[layer_idx](old_feature)
-        return self.f(my_thing + neighbor_thing)
-        
-    def aggregation(self, neighbor_features: Tensor):
-        return neighbor_features.mean(dim=0)
-    
-    def output(self, feature: Tensor):
-        return softmax(self.decoder(feature), dim=1)
+from src.gcn import CiteSeerGCN
 
 def training(node_features: Tensor, edge_list: Tensor, labels: Tensor, train_mask: Tensor, val_mask: Tensor, epochs: int=1):
     # node_count = node_features.shape[0]
@@ -83,27 +58,19 @@ def training(node_features: Tensor, edge_list: Tensor, labels: Tensor, train_mas
     return val_losses, train_losses, val_accuracies, train_accuracies
 
 def main():
-    args = ArgumentParser("TRAINER AAAAA")
-    args.add_argument("--epochs", type=int)
+    args = ArgumentParser("GraphML Toolkit")
+    args.add_argument("--task", required=True, choices=['gcn'])
+    args.add_argument("--epochs", type=int, default=10)
     options = args.parse_args()
 
-    dataset = get_citeseer_dataset()
-    dataset.download()
-    df = dataset.data
-    df = df.to(device=device_name)
-    # These two are the correct ways to get the data
-    # Do not use .get(idx), we don't know what it does
-    # print(dataset.data)
-    # print(dataset[0])
+    df = get_citeseer_dataset()
 
-    features = df.x
-    edges: Tensor = df.edge_index.T
-    labels = df.y
-
-    # edge_list = [(x, y) for x, y in edges]
-    # print(edge_list[:10])
-
-    print(training(features, edges, labels, df.train_mask, df.val_mask, epochs=options.epochs))
+    if options.task == 'gcn':
+        print(training(df.x, df.edge_index.T, df.y, df.train_mask, df.val_mask, epochs=options.epochs))
+    elif options.task == 'gin':
+        pass
+    elif options.task == 'rnn':
+        pass
         
 if __name__ == "__main__":
     main()
