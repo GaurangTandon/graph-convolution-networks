@@ -59,10 +59,10 @@ class MessagePassing(torch.nn.Module, ABC):
         node_count = features.shape[0]
         degree: List[int] = [0 for _ in range(node_count)]
 
-        def get_normalization_factor(x: int, y: int):
+        def get_normalization_factor(degree_list: List[int], x: int, y: int):
             # +1 because many nodes have degree 0 in citeseer dataset
-            dx = degree[x] + 1
-            dy = degree[x] + 1
+            dx = degree_list[x] + 1
+            dy = degree_list[y] + 1
             if self.norm_type == 'row':
                 return dx
             elif self.norm_type == 'col':
@@ -75,7 +75,7 @@ class MessagePassing(torch.nn.Module, ABC):
 
         neighbours_list: List[List[int]] = [[] for _ in range(node_count)]
         for x, y in edge_list:
-            neighbours_list[x.item()].append(y.item())
+            neighbours_list[y.item()].append(x.item())
             degree[y] += 1
 
         for layer_idx in range(self.layer_count):
@@ -84,7 +84,7 @@ class MessagePassing(torch.nn.Module, ABC):
             for node_idx in range(node_count):
                 # edge from y to x
                 neighbors = neighbours_list[node_idx]
-                neighbour_features = torch.stack([features[y] / get_normalization_factor(node_idx, y) for y in neighbors], dim=0) if len(neighbors) > 0 else torch.zeros(1, self.latent_dim, device=device)
+                neighbour_features = torch.stack([features[y] / get_normalization_factor(degree, node_idx, y) for y in neighbors], dim=0) if len(neighbors) > 0 else torch.zeros(1, self.latent_dim, device=device)
                 aggregated = self.aggregation(neighbour_features)
                 new_features.append(self.combine(features[node_idx], aggregated, layer_idx))
             features = torch.stack(new_features)
