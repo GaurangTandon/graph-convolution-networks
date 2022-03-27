@@ -6,3 +6,5 @@ torch_sparse
 torch_scatter
 tqdm
 torchtext
+torchdata
+keras

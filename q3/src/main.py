@@ -1,14 +1,15 @@
 from argparse import ArgumentParser
 import random
-from typing import List
+from typing import List, Tuple
 
 import numpy as np
 import torch
 from torch import Tensor
-from torch.nn.functional import cross_entropy
-from tqdm.auto import tqdm, trange
+from torch.nn.functional import cross_entropy, one_hot, pad as torch_pad
+from tqdm.auto import trange
 
-from src.dataloader import get_citeseer_dataset, get_imdb_dataset
+from src.message_passing import device
+from src.dataloader import get_citeseer_dataset, get_imdb_dataset, VOCAB_SIZE, MAXLEN
 from src.gcn import CiteSeerGCN
 from src.gin import CiteSeerGIN
 from src.rnn import GraphRNN
@@ -57,7 +58,7 @@ def training(model: torch.nn.Module, node_features: Tensor, edge_list: Tensor, l
 
     return val_losses, train_losses, val_accuracies, train_accuracies
 
-def train_rnn(model: torch.nn.Module, train_iter, test_iter):
+def train_rnn(model: torch.nn.Module, train_data: Tuple[List[List[int]], List[int]], test_data: Tuple[List[List[int]], List[int]], epoch_count: int):
     """
     It requires a completely different loop because IMDB data is structured differently
     """
@@ -68,12 +69,55 @@ def train_rnn(model: torch.nn.Module, train_iter, test_iter):
     train_accuracies: List[float] = []
     val_accuracies: List[float] = []
 
-    with tqdm(train_iter, desc="Training loop") as iter:
-        model.train()
-        optimizer.zero_grad()
+    train_samples, train_labels = train_data
+    test_samples, test_labels = test_data
+    def pad(lst: List[int], ml: int):
+        return lst + ([0 for _ in range(ml - len(lst))] if ml >= len(lst) else [])
+    def converter(samples: List[List[int]]):
+        return torch.stack([torch.LongTensor(pad(x, MAXLEN), device=device) for x in samples])
+    train_samples = converter(train_samples)
+    test_samples = converter(test_samples)
+    train_input = one_hot(train_samples, num_classes=VOCAB_SIZE).to(torch.float32)
+    train_labels = torch.LongTensor(train_labels)
+    test_labels = torch.LongTensor(test_labels)
 
-        for x, y in iter:
-            pass
+    with trange(epoch_count) as epoch_iter:
+        for epoch in epoch_iter:
+            train_loss = 0
+
+            model.train()
+            optimizer.zero_grad()
+
+            # (N, MAXLEN, VOCABSIZE)
+            print(train_input.shape)
+            # (N, )
+            print(train_labels.shape)
+            result = model(train_input)
+            train_accuracy = torch.mean(torch.eq(torch.argmax(result, dim=1), train_labels).float()).item()
+            train_accuracies.append(train_accuracy)
+            train_loss += cross_entropy(result, train_labels)
+
+            train_loss.backward()
+            train_losses.append(train_loss)
+            optimizer.step()
+
+            # with torch.no_grad():
+            #     model.eval()
+            #     val_loss = 0
+
+            #     for x, y in train_data:
+            #         result = model(x)
+            #         train_loss += 0
+
+            #     val_losses.append(val_loss)
+                
+            epoch_iter.set_postfix({
+                "train_loss": train_loss,
+                "train_accuracy": train_accuracy
+                # "val_loss": val_loss
+            })
+    
+    return train_accuracies
 
 def main():
     SEED = 42
@@ -88,9 +132,7 @@ def main():
     args.add_argument("--norm_type", type=str, default='none', choices=['none', 'row', 'col', 'symmetric'])
     options = args.parse_args()
 
-    citeseer_df = get_citeseer_dataset()
     # node_count = node_features.shape[0]
-    citeseer_input_dim = citeseer_df.x.shape[1]
     FEATURE_DIM = 16
 
     result = None
@@ -98,15 +140,22 @@ def main():
     print("CLI", options)
 
     if options.task == 'gcn':
+        citeseer_df = get_citeseer_dataset()
+        citeseer_input_dim = citeseer_df.x.shape[1]
         model = CiteSeerGCN(layers=2, input_dim=citeseer_input_dim, latent_dim=FEATURE_DIM, output_dim=6, norm_type=options.norm_type)
         result = training(model, citeseer_df.x, citeseer_df.edge_index.T, citeseer_df.y, citeseer_df.train_mask, citeseer_df.val_mask, epochs=options.epochs)
     elif options.task == 'compare':
+        citeseer_df = get_citeseer_dataset()
+        citeseer_input_dim = citeseer_df.x.shape[1]
         model = CiteSeerGIN(layers=2, input_dim=citeseer_input_dim, latent_dim=FEATURE_DIM, output_dim=6, norm_type=options.norm_type)
         result = training(model, citeseer_df.x, citeseer_df.edge_index.T, citeseer_df.y, citeseer_df.train_mask, citeseer_df.val_mask, epochs=options.epochs)
     elif options.task == 'rnn':
-        train_iter, test_iter = get_imdb_dataset()
-        model = GraphRNN(layers=2, input_dim=5, latent_dim=64, output_dim=2, norm_type=options.norm_type)
-        result = train_rnn(model, train_iter, test_iter)
+        (x_train, y_train), (x_test, y_test) = get_imdb_dataset()
+        model = GraphRNN(layers=2, input_dim=VOCAB_SIZE, latent_dim=64, output_dim=2, norm_type=options.norm_type)
+        SAMPLE_COUNT = 100
+        train_data = x_train[:SAMPLE_COUNT], y_train[:SAMPLE_COUNT]
+        test_data = x_test[:SAMPLE_COUNT], y_test[:SAMPLE_COUNT]
+        result = train_rnn(model, train_data, test_data, epoch_count=options.epochs)
 
     print(result)
 

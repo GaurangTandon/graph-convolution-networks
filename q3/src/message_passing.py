@@ -15,7 +15,7 @@ class MessagePassing(torch.nn.Module, ABC):
 
     We cannot build adjacency matrix because of memory overflow error
     """
-    def __init__(self, layers: int, input_dim: int, latent_dim: int, output_dim: int, norm_type: str) -> None:
+    def __init__(self, layers: int, input_dim: int, latent_dim: int, output_dim: int, norm_type: str, is_rnn: bool=False) -> None:
         """
         We must take only these dimensions as our input and train on them
         This is so that if tomorrow our graph adds more nodes to itself, then we should
@@ -29,6 +29,7 @@ class MessagePassing(torch.nn.Module, ABC):
         self.neighbours_aggregated: Optional[Tensor] = None
         self.neighbour_count: Optional[Tensor] = None
         self.norm_type = norm_type
+        self.is_rnn = is_rnn
 
         self.initialization()
 
@@ -54,9 +55,10 @@ class MessagePassing(torch.nn.Module, ABC):
         features = Node features/the X tensor
         Edge list = list of edges (from a to b)
         """
-
-        features = self.encoder(features)
-        node_count = features.shape[0]
+ 
+        features = self.encoder(features) 
+        adder = (1 if self.is_rnn else 0)
+        node_count = features.shape[0] + adder
         degree: List[int] = [0 for _ in range(node_count)]
 
         def get_normalization_factor(degree_list: List[int], x: int, y: int):
@@ -82,9 +84,8 @@ class MessagePassing(torch.nn.Module, ABC):
             new_features: List[Tensor] = []
 
             for node_idx in range(node_count):
-                # edge from y to x
                 neighbors = neighbours_list[node_idx]
-                neighbour_features = torch.stack([features[y] / get_normalization_factor(degree, node_idx, y) for y in neighbors], dim=0) if len(neighbors) > 0 else torch.zeros(1, self.latent_dim, device=device)
+                neighbour_features = torch.stack([features[y] / get_normalization_factor(degree, node_idx, y) for y in neighbors], dim=0) if len(neighbors) > 0 else torch.zeros(1, self.latent_dim + adder, device=device)
                 aggregated = self.aggregation(neighbour_features)
                 new_features.append(self.combine(features[node_idx], aggregated, layer_idx))
             features = torch.stack(new_features)

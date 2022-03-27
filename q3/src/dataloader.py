@@ -1,10 +1,15 @@
+from ftplib import MAXLINE
 from pathlib import Path
 from typing import Dict, Tuple, List
 
-from torch_geometric.datasets import Planetoid, TUDataset
-from torchtext.datasets import IMDB
+from torch_geometric.datasets import Planetoid
+# from torchtext.datasets import IMDB
+import tensorflow as tf
 
 from src.message_passing import device_name
+
+VOCAB_SIZE = 1000
+MAXLEN = 32
 
 def read_nodes(dirpath: str='..\\citeseer'):
     node_id_to_idx: Dict[str, int] = {}
@@ -63,9 +68,9 @@ def get_citeseer_dataset():
     
 
 def get_imdb_dataset():
+    """
+    I tried torchtext but it sucks. It really does.
+    """
     path = Path.cwd().parent / "imdb"
-    splits: Tuple[str, str] = ("train", "test")
-    train_iter, test_iter = IMDB(root=str(path), split=splits)
-    
-    # Which graph to use? It has #1000 graphs
-    return train_iter, test_iter
+    args = tf.keras.datasets.imdb.load_data(path=str(path), num_words=VOCAB_SIZE, maxlen=MAXLEN)
+    return args
