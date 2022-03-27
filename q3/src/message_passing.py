@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, Optional
 
 import torch
 from torch import IntTensor, Tensor
@@ -26,6 +26,9 @@ class MessagePassing(torch.nn.Module, ABC):
         self.input_dim = input_dim
         self.latent_dim = latent_dim
         self.output_dim = output_dim
+        self.neighbours_aggregated: Optional[Tensor] = None
+        self.neighbour_count: Optional[Tensor] = None
+
         self.initialization()
 
     @abstractmethod
@@ -51,7 +54,7 @@ class MessagePassing(torch.nn.Module, ABC):
         Edge list = list of edges (from a to b)
         """
 
-        def get_normalization_factor(self, x, y):
+        def get_normalization_factor(x: int, y: int):
             return 1
 
         features = self.encoder(features)
@@ -67,7 +70,7 @@ class MessagePassing(torch.nn.Module, ABC):
             for node_idx in range(node_count):
                 # edge from y to x
                 neighbors = neighbours_list[node_idx]
-                neighbour_features = torch.stack([features[y] / self.get_normalization_factor(node_idx, y) for y in neighbors]) if len(neighbors) > 0 else torch.zeros(1, self.latent_dim, device=device)
+                neighbour_features = torch.stack([features[y] / get_normalization_factor(node_idx, y) for y in neighbors]) if len(neighbors) > 0 else torch.zeros(1, self.latent_dim, device=device)
                 aggregated = self.aggregation(neighbour_features)
                 new_features.append(self.combine(features[node_idx], aggregated, layer_idx))
             features = torch.stack(new_features)
