@@ -15,7 +15,7 @@ class MessagePassing(torch.nn.Module, ABC):
 
     We cannot build adjacency matrix because of memory overflow error
     """
-    def __init__(self, layers: int, input_dim: int, latent_dim: int, output_dim: int) -> None:
+    def __init__(self, layers: int, input_dim: int, latent_dim: int, output_dim: int, norm_type: str) -> None:
         """
         We must take only these dimensions as our input and train on them
         This is so that if tomorrow our graph adds more nodes to itself, then we should
@@ -28,6 +28,7 @@ class MessagePassing(torch.nn.Module, ABC):
         self.output_dim = output_dim
         self.neighbours_aggregated: Optional[Tensor] = None
         self.neighbour_count: Optional[Tensor] = None
+        self.norm_type = norm_type
 
         self.initialization()
 
@@ -54,15 +55,28 @@ class MessagePassing(torch.nn.Module, ABC):
         Edge list = list of edges (from a to b)
         """
 
-        def get_normalization_factor(x: int, y: int):
-            return 1
-
         features = self.encoder(features)
         node_count = features.shape[0]
+        degree: List[int] = [0 for _ in range(node_count)]
+
+        def get_normalization_factor(x: int, y: int):
+            # +1 because many nodes have degree 0 in citeseer dataset
+            dx = degree[x] + 1
+            dy = degree[x] + 1
+            if self.norm_type == 'row':
+                return dx
+            elif self.norm_type == 'col':
+                return dy
+            elif self.norm_type == 'symmetric':
+                return (dx * dy) ** 0.5
+            else:
+                assert self.norm_type == 'none'
+                return 1
 
         neighbours_list: List[List[int]] = [[] for _ in range(node_count)]
         for x, y in edge_list:
             neighbours_list[x.item()].append(y.item())
+            degree[y] += 1
 
         for layer_idx in range(self.layer_count):
             new_features: List[Tensor] = []

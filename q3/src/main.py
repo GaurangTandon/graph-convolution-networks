@@ -66,6 +66,7 @@ def main():
     args = ArgumentParser("GraphML Toolkit")
     args.add_argument("--task", required=True, choices=['gcn', 'compare', 'rnn'])
     args.add_argument("--epochs", type=int, default=10)
+    args.add_argument("--norm_type", type=str, default='none', choices=['none', 'row', 'col', 'symmetric'])
     options = args.parse_args()
 
     citeseer_df = get_citeseer_dataset()
@@ -74,11 +75,14 @@ def main():
     FEATURE_DIM = 16
 
     result = None
+
+    print("CLI", options)
+
     if options.task == 'gcn':
-        model = CiteSeerGCN(layers=2, input_dim=citeseer_input_dim, latent_dim=FEATURE_DIM, output_dim=6)
+        model = CiteSeerGCN(layers=2, input_dim=citeseer_input_dim, latent_dim=FEATURE_DIM, output_dim=6, norm_type=options.norm_type)
         result = training(model, citeseer_df.x, citeseer_df.edge_index.T, citeseer_df.y, citeseer_df.train_mask, citeseer_df.val_mask, epochs=options.epochs)
     elif options.task == 'compare':
-        model = CiteSeerGIN(layers=2, input_dim=citeseer_input_dim, latent_dim=FEATURE_DIM, output_dim=6)
+        model = CiteSeerGIN(layers=2, input_dim=citeseer_input_dim, latent_dim=FEATURE_DIM, output_dim=6, norm_type=options.norm_type)
         result = training(model, citeseer_df.x, citeseer_df.edge_index.T, citeseer_df.y, citeseer_df.train_mask, citeseer_df.val_mask, epochs=options.epochs)
     elif options.task == 'rnn':
         pass
