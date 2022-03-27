@@ -1,3 +1,4 @@
+from argparse import ArgumentParser
 from typing import Optional, List
 
 import torch
@@ -81,8 +82,11 @@ def training(node_features: Tensor, edge_list: Tensor, labels: Tensor, train_mas
         
     return val_losses, train_losses, val_accuracies, train_accuracies
 
-        
-if __name__ == "__main__":
+def main():
+    args = ArgumentParser("TRAINER AAAAA")
+    args.add_argument("--epochs", type=int)
+    options = args.parse_args()
+
     dataset = get_citeseer_dataset()
     dataset.download()
     df = dataset.data
@@ -99,4 +103,7 @@ if __name__ == "__main__":
     # edge_list = [(x, y) for x, y in edges]
     # print(edge_list[:10])
 
-    print(training(features, edges, labels, df.train_mask, df.val_mask, epochs=50))
+    print(training(features, edges, labels, df.train_mask, df.val_mask, epochs=options.epochs))
+        
+if __name__ == "__main__":
+    main()
