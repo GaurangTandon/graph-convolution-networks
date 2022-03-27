@@ -84,7 +84,7 @@ class MessagePassing(torch.nn.Module, ABC):
             for node_idx in range(node_count):
                 # edge from y to x
                 neighbors = neighbours_list[node_idx]
-                neighbour_features = torch.stack([features[y] / get_normalization_factor(node_idx, y) for y in neighbors]) if len(neighbors) > 0 else torch.zeros(1, self.latent_dim, device=device)
+                neighbour_features = torch.stack([features[y] / get_normalization_factor(node_idx, y) for y in neighbors], dim=0) if len(neighbors) > 0 else torch.zeros(1, self.latent_dim, device=device)
                 aggregated = self.aggregation(neighbour_features)
                 new_features.append(self.combine(features[node_idx], aggregated, layer_idx))
             features = torch.stack(new_features)

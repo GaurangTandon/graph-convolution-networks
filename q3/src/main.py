@@ -6,11 +6,12 @@ import numpy as np
 import torch
 from torch import Tensor
 from torch.nn.functional import cross_entropy
-from tqdm.auto import trange
+from tqdm.auto import tqdm, trange
 
-from src.dataloader import get_citeseer_dataset
+from src.dataloader import get_citeseer_dataset, get_imdb_dataset
 from src.gcn import CiteSeerGCN
 from src.gin import CiteSeerGIN
+from src.rnn import GraphRNN
 
 def training(model: torch.nn.Module, node_features: Tensor, edge_list: Tensor, labels: Tensor, train_mask: Tensor, val_mask: Tensor, epochs: int=1):
     optimizer = torch.optim.Adam(params=model.parameters())
@@ -53,8 +54,26 @@ def training(model: torch.nn.Module, node_features: Tensor, edge_list: Tensor, l
                 val_losses.append(val_loss)
 
             it.set_postfix({ "val_loss": val_loss, "train_loss": train_loss.item(), "val_accuracy": val_accuracy, "train_accuracy": train_accuracy })
-        
+
     return val_losses, train_losses, val_accuracies, train_accuracies
+
+def train_rnn(model: torch.nn.Module, train_iter, test_iter):
+    """
+    It requires a completely different loop because IMDB data is structured differently
+    """
+
+    optimizer = torch.optim.Adam(params=model.parameters())
+    train_losses: List[float] = []
+    val_losses: List[float] = []
+    train_accuracies: List[float] = []
+    val_accuracies: List[float] = []
+
+    with tqdm(train_iter, desc="Training loop") as iter:
+        model.train()
+        optimizer.zero_grad()
+
+        for x, y in iter:
+            pass
 
 def main():
     SEED = 42
@@ -62,7 +81,7 @@ def main():
     random.seed(SEED)
     np.random.seed(SEED)
     torch.use_deterministic_algorithms(True)
-    
+
     args = ArgumentParser("GraphML Toolkit")
     args.add_argument("--task", required=True, choices=['gcn', 'compare', 'rnn'])
     args.add_argument("--epochs", type=int, default=10)
@@ -85,9 +104,11 @@ def main():
         model = CiteSeerGIN(layers=2, input_dim=citeseer_input_dim, latent_dim=FEATURE_DIM, output_dim=6, norm_type=options.norm_type)
         result = training(model, citeseer_df.x, citeseer_df.edge_index.T, citeseer_df.y, citeseer_df.train_mask, citeseer_df.val_mask, epochs=options.epochs)
     elif options.task == 'rnn':
-        pass
+        train_iter, test_iter = get_imdb_dataset()
+        model = GraphRNN(layers=2, input_dim=5, latent_dim=64, output_dim=2, norm_type=options.norm_type)
+        result = train_rnn(model, train_iter, test_iter)
 
     print(result)
-        
+
 if __name__ == "__main__":
     main()
