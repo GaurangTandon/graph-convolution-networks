@@ -1,3 +1,7 @@
 torch==1.11.0+cu113
 numpy==1.22.3
 scipy==1.8.0
+torch_geometric
+torch_sparse
+torch_scatter
+tqdm
