@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Dict, Tuple, List
 
-from torch_geometric.datasets import Planetoid
+from torch_geometric.datasets import Planetoid, TUDataset
 
 from src.message_passing import device_name
 
@@ -60,3 +60,10 @@ def get_citeseer_dataset():
     edge_list = read_edges(node_id_maps)
     return edge_list, node_labels
     
+
+def get_imdb_dataset():
+    path = Path.cwd().parent / "imdb"
+    pt = TUDataset(root=str(path), name="IMDB-BINARY")
+    pt.download()
+    # Which graph to use? It has #1000 graphs
+    return pt.data.to(device=device_name)
