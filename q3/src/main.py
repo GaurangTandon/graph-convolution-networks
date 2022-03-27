@@ -78,27 +78,36 @@ def train_rnn(model: torch.nn.Module, train_data: Tuple[List[List[int]], List[in
     train_samples = converter(train_samples)
     test_samples = converter(test_samples)
     train_input = one_hot(train_samples, num_classes=VOCAB_SIZE).to(torch.float32)
-    train_labels = torch.LongTensor(train_labels)
-    test_labels = torch.LongTensor(test_labels)
+    train_labels = torch.FloatTensor(train_labels)
+    # print(train_labels.shape)
+    test_labels = torch.FloatTensor(test_labels)
 
     with trange(epoch_count) as epoch_iter:
         for epoch in epoch_iter:
             train_loss = 0
+            correct, total = 0, 0
+            accuracies = 0
 
-            model.train()
-            optimizer.zero_grad()
+            for x, y in zip(train_input, train_labels):
+                model.train()
+                optimizer.zero_grad()
 
-            # (N, MAXLEN, VOCABSIZE)
-            print(train_input.shape)
-            # (N, )
-            print(train_labels.shape)
-            result = model(train_input)
-            train_accuracy = torch.mean(torch.eq(torch.argmax(result, dim=1), train_labels).float()).item()
+                result = model(x)
+                y = torch.tensor(y).long()
+                # print(result, result.shape)
+                cls = torch.argmax(result, dim=0)
+                accuracies += torch.mean(torch.eq(cls, y).float()).item()
+                # cls = cls.reshape(1)
+                # y = y.reshape(1)
+                train_loss += cross_entropy(result, y)
+                # train_loss += cross_entropy(torch.FloatTensor([[cls]]), torch.FloatTensor([[y]]))
+                total += 1
+
+            train_accuracy = accuracies / total
             train_accuracies.append(train_accuracy)
-            train_loss += cross_entropy(result, train_labels)
 
             train_loss.backward()
-            train_losses.append(train_loss)
+            train_losses.append(train_loss.item())
             optimizer.step()
 
             # with torch.no_grad():
@@ -112,7 +121,7 @@ def train_rnn(model: torch.nn.Module, train_data: Tuple[List[List[int]], List[in
             #     val_losses.append(val_loss)
                 
             epoch_iter.set_postfix({
-                "train_loss": train_loss,
+                "train_loss": train_loss.item(),
                 "train_accuracy": train_accuracy
                 # "val_loss": val_loss
             })
@@ -152,7 +161,7 @@ def main():
     elif options.task == 'rnn':
         (x_train, y_train), (x_test, y_test) = get_imdb_dataset()
         model = GraphRNN(layers=2, input_dim=VOCAB_SIZE, latent_dim=64, output_dim=2, norm_type=options.norm_type)
-        SAMPLE_COUNT = 100
+        SAMPLE_COUNT = 10000
         train_data = x_train[:SAMPLE_COUNT], y_train[:SAMPLE_COUNT]
         test_data = x_test[:SAMPLE_COUNT], y_test[:SAMPLE_COUNT]
         result = train_rnn(model, train_data, test_data, epoch_count=options.epochs)

@@ -14,20 +14,20 @@ class GraphRNN(MessagePassing):
 
     def initialization(self):
         self.encoder_method = Linear(self.input_dim, self.latent_dim, device=device)
-        self.decoder = Linear(self.latent_dim, self.output_dim, device=device)
+        self.decoder = Linear(self.latent_dim + 1, self.output_dim, device=device)
 
-        self.weights = ModuleList([Linear(self.latent_dim, self.latent_dim) for _ in range(self.layer_count)])
+        self.weights = ModuleList([Linear(self.latent_dim + 1, self.latent_dim + 1) for _ in range(self.layer_count)])
     
     def encoder(self, features: Tensor):
         features = self.encoder_method(features)
-        # features: (N, MAXLEN, LATENTDIM)
-        add1 = torch.zeros(features.shape[0], 1, self.latent_dim)
-        features = torch.cat((add1, features), dim=1)
-        add2 = torch.zeros(features.shape[0], features.shape[1], 1)
-        features = torch.cat((add2, features), dim=2)
-        # features: (N, MAXLEN + 1, LATENTDIM + 1)
-        features[:, 0, 0] = 1
-        features[:, :, 0] = 0
+        # features: (MAXLEN, LATENTDIM)
+        add1 = torch.zeros(1, self.latent_dim)
+        features = torch.cat((add1, features), dim=0)
+        add2 = torch.zeros(features.shape[0], 1)
+        features = torch.cat((add2, features), dim=1)
+        # features: (MAXLEN + 1, LATENTDIM + 1)
+        features[:][0] = 0
+        features[0][0] = 1
         return features
 
     def aggregation(self, neighbor_features: Tensor) -> Tensor:
@@ -37,17 +37,21 @@ class GraphRNN(MessagePassing):
         """
         Acts like a shift register, shifting information from right neighbor to left neighbor
         """
-        # print(old_feature.shape): MAXLEN+1, LATENTDIM+1
-        if old_feature[-1].item() == 1:
-            new_feature: Tensor = (self.weights[layer_idx](old_feature[:-1]) + neighbor_aggregated[:-1])
-            new_feature = new_feature.unsqueeze(1)
-            new_feature[-1] = 1
-            return new_feature
+        old_feature = old_feature.reshape(-1)
+        # print(old_feature.shape) # LATENTDIM+1
+        if old_feature[0].item() == 1:
+            # print(old_feature.shape, old_feature[1:].shape)
+            new_feature: Tensor = (self.weights[layer_idx](old_feature) + neighbor_aggregated)
+            # add1 = torch.zeros(1)
+            # new_feature = torch.cat(new_feature, add1, dim=0)
+            new_feature[0] = 1
+            # print(new_feature.shape, old_feature.shape)
+            return new_feature.reshape(-1)
         else:
-            return neighbor_aggregated
+            return neighbor_aggregated.reshape(-1)
 
     def output(self, feature: Tensor) -> Tensor:
-        return softmax(self.decoder(feature), dim=1)
+        return softmax(self.decoder(feature[0]))
 
     # need to override forward because different signature
     def forward(self, features: Tensor):

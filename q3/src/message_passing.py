@@ -58,7 +58,7 @@ class MessagePassing(torch.nn.Module, ABC):
  
         features = self.encoder(features) 
         adder = (1 if self.is_rnn else 0)
-        node_count = features.shape[0] + adder
+        node_count = features.shape[0]
         degree: List[int] = [0 for _ in range(node_count)]
 
         def get_normalization_factor(degree_list: List[int], x: int, y: int):
